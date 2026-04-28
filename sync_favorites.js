@@ -1,97 +1,40 @@
-(function () {
-    'use strict';
+function syncFavorites() {
+    let favorites = null;
+    let bookmarks = null;
 
-    function syncFavorites() {
-        let favorites = null;
+    try {
+        favorites = Lampa.Storage.get('favorite') 
+                 || Lampa.Storage.get('favorites') 
+                 || (Lampa.Favorite ? Lampa.Favorite.list() : null);
 
-        try {
-            // Пробуем разные варианты хранения
-            favorites = Lampa.Storage.get('favorite') 
-                     || Lampa.Storage.get('favorites') 
-                     || (Lampa.Favorite ? Lampa.Favorite.list() : null);
-        } catch (e) {
-            Lampa.Noty.show('Ошибка получения избранного');
-            return;
-        }
-
-        if (!favorites) {
-            Lampa.Noty.show('Избранное не найдено');
-            return;
-        }
-
-        try {
-            const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
-
-            const payload = {
-                time: new Date().toISOString(),
-                favorites: favorites
-            };
-
-            const encoded = encodeURIComponent(JSON.stringify(payload));
-
-            // 🚀 отправка через Image (без CORS)
-            const img = new Image();
-            img.src = url + '?data=' + encoded;
-
-            Lampa.Noty.show('Отправлено!');
-        } catch (e) {
-            Lampa.Noty.show('Ошибка отправки');
-        }
+        bookmarks = Lampa.Storage.get('bookmark') 
+                 || Lampa.Storage.get('bookmarks');
+    } catch (e) {
+        Lampa.Noty.show('Ошибка получения данных');
+        return;
     }
 
-    function init() {
-        console.log('Favorites Sync Plugin loaded');
+    const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
-        if (Lampa.SettingsApi) {
-            Lampa.SettingsApi.addParam({
-                component: 'interface',
-                param: {
-                    name: 'sync_favorites',
-                    type: 'button',
-                    default: false
-                },
-                field: {
-                    name: '📡 Отправить избранное',
-                    description: 'Отправка на webhook'
-                },
-                onChange: function () {
-                    syncFavorites();
-                }
-            });
-        }
-    }
+    const payload = {
+        time: new Date().toISOString(),
+        favorites: favorites || [],
+        bookmarks: bookmarks || []
+    };
 
-    // Гарантированный запуск
-    setTimeout(init, 3000);
+    const xhr = new XMLHttpRequest();
 
-})();        } catch (e) {
-            Lampa.Noty.show('Ошибка отправки');
-        }
-    }
+    xhr.open('POST', url, true);
 
-    function init() {
-        console.log('Favorites Sync Plugin loaded');
+    // ❗ ВАЖНО: без headers (иначе может ломаться)
+    xhr.onload = function () {
+        Lampa.Noty.show('POST отправлен');
+        console.log('OK:', xhr.responseText);
+    };
 
-        if (Lampa.SettingsApi) {
-            Lampa.SettingsApi.addParam({
-                component: 'interface',
-                param: {
-                    name: 'sync_favorites',
-                    type: 'button',
-                    default: false
-                },
-                field: {
-                    name: '📡 Отправить избранное',
-                    description: 'Отправка на webhook'
-                },
-                onChange: function () {
-                    syncFavorites();
-                }
-            });
-        }
-    }
+    xhr.onerror = function () {
+        Lampa.Noty.show('Ошибка POST');
+    };
 
-    // Гарантированный запуск
-    setTimeout(init, 3000);
-
-})();
+    xhr.send(JSON.stringify(payload));
+}
