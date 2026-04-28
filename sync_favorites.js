@@ -1,150 +1,58 @@
 (function () {
     'use strict';
 
-    const URL = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
-
-    function safeGet(key) {
+    function get() {
         try {
-            return Lampa.Storage.get(key);
+            return (Lampa.Favorite && Lampa.Favorite.list)
+                ? Lampa.Favorite.list()
+                : [];
         } catch (e) {
-            return null;
+            return [];
         }
     }
 
-    function collectRaw() {
+    function send(data) {
 
-        const storage = safeGet('favorite') || safeGet('favorites') || {};
+        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
-        const keys = [
-            'card',
-            'like',
-            'book',
-            'look',
-            'scheduled',
-            'continued',
-            'history',
-            'wath',
-            'viewed'
-        ];
-
-        let fromStorage = [];
-
-        keys.forEach(k => {
-            if (Array.isArray(storage[k])) {
-                fromStorage.push(...storage[k]);
-            }
-        });
-
-        const fromAPI = (Lampa.Favorite && Lampa.Favorite.list)
-            ? Lampa.Favorite.list()
-            : [];
-
-        return [...fromStorage, ...fromAPI];
-    }
-
-    function normalize(items) {
-
-        const map = new Map();
-
-        items.forEach(i => {
-            if (!i || !i.id) return;
-
-            const id = i.id;
-
-            map.set(id, {
-                id: id,
-
-                // НЕ завязываемся на next_episode (это ломало всё)
-                type: i.number_of_seasons ? 'tv' : 'movie',
-
-                title:
-                    i.title ||
-                    i.name ||
-                    i.original_title ||
-                    i.original_name ||
-                    'Unknown',
-
-                poster: i.poster_path || null,
-
-                status: i.status || null,
-
-                // сохраняем если есть, но НЕ используем как фильтр
-                next_episode: i.next_episode_to_air || null
-            });
-        });
-
-        return [...map.values()];
-    }
-
-    function send(payload) {
-
-        const data = JSON.stringify(payload);
-
-        try {
-            const xhr = new XMLHttpRequest();
-
-            xhr.open('POST', URL, true);
-
-            xhr.onload = function () {
-                Lampa.Noty.show('v5 POST OK');
-                console.log('v5 SENT');
-            };
-
-            xhr.onerror = function () {
-                fallback(data);
-            };
-
-            xhr.send(data);
-
-        } catch (e) {
-            fallback(data);
-        }
-    }
-
-    function fallback(data) {
-        const img = new Image();
-        img.src = URL + '?data=' + encodeURIComponent(data);
-
-        Lampa.Noty.show('v5 fallback sent');
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
+        xhr.send(JSON.stringify(data));
     }
 
     function sync() {
 
-        const raw = collectRaw();
-        const items = normalize(raw);
-
-        console.log('RAW:', raw.length);
-        console.log('FINAL:', items.length);
-
-        if (!items.length) {
-            Lampa.Noty.show('Пусто');
-            return;
-        }
+        const items = get();
 
         const payload = {
             time: new Date().toISOString(),
             count: items.length,
-            items: items
+            items: items.map(i => ({
+                id: i.id,
+                title: i.title || i.name || i.original_name || '',
+                type: i.number_of_seasons ? 'tv' : 'movie'
+            }))
         };
 
         send(payload);
+
+        Lampa.Noty.show('sync v6');
+        console.log(payload);
     }
 
     function init() {
-
-        console.log('Lampa v5 tracker loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'sync_v5',
+                    name: 'sync_v6',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: '📡 Sync ALL v5 (FULL)',
-                    description: 'Полный сбор без потерь'
+                    name: '📡 Sync v6',
+                    description: 'Simple favorites sync'
                 },
                 onChange: sync
             });
