@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    function downloadFavorites() {
+    function syncFavorites() {
         let favorites = null;
 
         try {
@@ -18,39 +18,46 @@
             return;
         }
 
-        // создаём файл
-        const dataStr = JSON.stringify(favorites, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
+        // 🔥 твой webhook
+        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'favorites.json';
-        a.click();
-
-        URL.revokeObjectURL(url);
-
-        Lampa.Noty.show('Файл с избранным скачан');
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                time: new Date().toISOString(),
+                favorites: favorites
+            })
+        })
+        .then(res => {
+            Lampa.Noty.show('Отправлено!');
+            console.log('Webhook response:', res);
+        })
+        .catch(err => {
+            console.error('Ошибка отправки:', err);
+            Lampa.Noty.show('Ошибка отправки');
+        });
     }
 
     function init() {
-        console.log('Plugin: Favorites Downloader loaded');
+        console.log('Plugin: Favorites Sync loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'download_favorites',
+                    name: 'sync_favorites',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: 'Скачать избранное',
-                    description: 'Сохраняет JSON файл'
+                    name: 'Отправить избранное',
+                    description: 'Отправка на webhook'
                 },
                 onChange: function () {
-                    downloadFavorites();
+                    syncFavorites();
                 }
             });
         }
