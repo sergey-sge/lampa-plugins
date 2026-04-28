@@ -22,23 +22,18 @@
         const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
         fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                time: new Date().toISOString(),
-                favorites: favorites
-            })
-        })
-        .then(res => {
-            Lampa.Noty.show('Отправлено!');
-            console.log('Webhook response:', res);
-        })
-        .catch(err => {
-            console.error('Ошибка отправки:', err);
-            Lampa.Noty.show('Ошибка отправки');
-        });
+    method: 'POST',
+    body: JSON.stringify({
+        time: new Date().toISOString(),
+        favorites: favorites
+    })
+})
+.then(res => {
+    Lampa.Noty.show('Отправлено!');
+})
+.catch(err => {
+    Lampa.Noty.show('Ошибка отправки');
+});
     }
 
     function init() {
