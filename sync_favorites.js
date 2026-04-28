@@ -1,71 +1,60 @@
 (function () {
     'use strict';
 
-    function getFavorites() {
+    function downloadFavorites() {
         let favorites = null;
 
         try {
-            // Попытка 1 (чаще всего)
-            favorites = Lampa.Storage.get('favorite');
-
-            // Попытка 2 (альтернатива)
-            if (!favorites) {
-                favorites = Lampa.Storage.get('favorites');
-            }
-
-            // Попытка 3 (иногда используется)
-            if (!favorites) {
-                favorites = Lampa.Favorite ? Lampa.Favorite.list() : null;
-            }
-
+            favorites = Lampa.Storage.get('favorite') 
+                     || Lampa.Storage.get('favorites') 
+                     || (Lampa.Favorite ? Lampa.Favorite.list() : null);
         } catch (e) {
-            console.error('Ошибка получения избранного:', e);
+            Lampa.Noty.show('Ошибка получения избранного');
+            return;
         }
-
-        console.log('=== FAVORITES ===');
-        console.log(favorites);
 
         if (!favorites) {
-            Lampa.Noty.show('Не удалось получить избранное');
-        } else {
-            Lampa.Noty.show('Избранное выведено в консоль');
+            Lampa.Noty.show('Избранное не найдено');
+            return;
         }
 
-        return favorites;
+        // создаём файл
+        const dataStr = JSON.stringify(favorites, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'favorites.json';
+        a.click();
+
+        URL.revokeObjectURL(url);
+
+        Lampa.Noty.show('Файл с избранным скачан');
     }
 
     function init() {
-        console.log('Plugin: Sync Favorites loaded');
+        console.log('Plugin: Favorites Downloader loaded');
 
-        // Добавляем кнопку в настройки
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'sync_favorites',
+                    name: 'download_favorites',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: 'Синхронизировать избранное',
-                    description: 'Выводит избранное в консоль'
+                    name: 'Скачать избранное',
+                    description: 'Сохраняет JSON файл'
                 },
                 onChange: function () {
-                    getFavorites();
+                    downloadFavorites();
                 }
             });
         }
     }
 
-    // Ждём загрузки Lampa
-    if (window.appready) {
-        init();
-    } else {
-        Lampa.Listener.follow('app', function (event) {
-            if (event.type === 'ready') {
-                init();
-            }
-        });
-    }
-
+    setTimeout(init, 2000);
 })();
