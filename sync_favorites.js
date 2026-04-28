@@ -42,7 +42,7 @@
             xhr.open('POST', url, true);
 
             // ❗ важно: НЕ ставим headers вообще
-
+            // РАБОЧАЯ ВЕРСИЯ!!!
             xhr.onload = function () {
                 Lampa.Noty.show('POST отправлен');
                 console.log('RESPONSE:', xhr.responseText);
