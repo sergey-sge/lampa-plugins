@@ -19,7 +19,7 @@
 
     function collectAll() {
 
-        const storage = getStorage('bookmark') || getStorage('bookmarks') || {};
+        const storage = getStorage('favorite') || getStorage('favorites') || {};
 
         const fromStorage = [
             ...(storage.card || []),
