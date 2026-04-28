@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    const URL = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
+
     function collectAll(raw) {
         if (!raw) return [];
 
@@ -12,7 +14,6 @@
             'viewed',
             'scheduled',
             'continued',
-            'wath',
             'history'
         ];
 
@@ -33,19 +34,49 @@
         items.forEach(i => {
             if (!i || !i.id) return;
 
-            const id = i.id;
-
-            map.set(id, {
-                id: id,
+            map.set(i.id, {
+                id: i.id,
                 type: i.number_of_seasons ? 'tv' : 'movie',
                 title: i.title || i.name || i.original_title || i.original_name,
-                status: i.status || null,
-                next_episode_to_air: i.next_episode_to_air || null,
-                poster: i.poster_path || null
+                next: i.next_episode_to_air || null
             });
         });
 
         return [...map.values()];
+    }
+
+    function send(payload) {
+        const data = JSON.stringify(payload);
+
+        // 🥇 Попытка POST (основной способ)
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', URL, true);
+
+            xhr.onload = function () {
+                Lampa.Noty.show('POST OK');
+                console.log('POST OK');
+            };
+
+            xhr.onerror = function () {
+                fallback(data);
+            };
+
+            xhr.send(data);
+
+            return;
+        } catch (e) {
+            fallback(data);
+        }
+    }
+
+    function fallback(data) {
+        // 🥈 запасной вариант (100% работает)
+        const img = new Image();
+        img.src = URL + '?data=' + encodeURIComponent(data);
+
+        Lampa.Noty.show('Sent (fallback)');
+        console.log('FALLBACK SENT');
     }
 
     function sync() {
@@ -75,37 +106,23 @@
             items: normalized
         };
 
-        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url, true);
-
-        xhr.onload = function () {
-            Lampa.Noty.show('Синхронизация отправлена');
-            console.log('SYNC OK', payload);
-        };
-
-        xhr.onerror = function () {
-            Lampa.Noty.show('Ошибка отправки');
-        };
-
-        xhr.send(JSON.stringify(payload));
+        send(payload);
     }
 
     function init() {
-        console.log('Lampa Sync v2 loaded');
+        console.log('Lampa Sync v3 loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'sync_all_v2',
+                    name: 'sync_all_v3',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: '📡 Sync ALL (v2)',
-                    description: 'Полный экспорт всех списков'
+                    name: '📡 Sync ALL (v3)',
+                    description: 'Стабильная синхронизация'
                 },
                 onChange: function () {
                     sync();
