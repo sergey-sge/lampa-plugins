@@ -64,4 +64,34 @@
     // Гарантированный запуск
     setTimeout(init, 3000);
 
+})();        } catch (e) {
+            Lampa.Noty.show('Ошибка отправки');
+        }
+    }
+
+    function init() {
+        console.log('Favorites Sync Plugin loaded');
+
+        if (Lampa.SettingsApi) {
+            Lampa.SettingsApi.addParam({
+                component: 'interface',
+                param: {
+                    name: 'sync_favorites',
+                    type: 'button',
+                    default: false
+                },
+                field: {
+                    name: '📡 Отправить избранное',
+                    description: 'Отправка на webhook'
+                },
+                onChange: function () {
+                    syncFavorites();
+                }
+            });
+        }
+    }
+
+    // Гарантированный запуск
+    setTimeout(init, 3000);
+
 })();
