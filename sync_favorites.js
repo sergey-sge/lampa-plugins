@@ -1,7 +1,9 @@
 (function () {
     'use strict';
 
-    function getStorage(key) {
+    const URL = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
+
+    function safeGet(key) {
         try {
             return Lampa.Storage.get(key);
         } catch (e) {
@@ -9,33 +11,35 @@
         }
     }
 
-    function collectFromFavoriteAPI() {
-        try {
-            return Lampa.Favorite ? Lampa.Favorite.list() : [];
-        } catch (e) {
-            return [];
-        }
-    }
+    function collectRaw() {
 
-    function collectAll() {
+        const storage = safeGet('favorite') || safeGet('favorites') || {};
 
-        const storage = getStorage('favorite') || getStorage('favorites') || {};
-
-        const fromStorage = [
-            ...(storage.card || []),
-            ...(storage.like || []),
-            ...(storage.book || []),
-            ...(storage.look || []),
-            ...(storage.scheduled || []),
-            ...(storage.continued || []),
-            ...(storage.history || [])
+        const keys = [
+            'card',
+            'like',
+            'book',
+            'look',
+            'scheduled',
+            'continued',
+            'history',
+            'wath',
+            'viewed'
         ];
 
-        const fromAPI = collectFromFavoriteAPI();
+        let fromStorage = [];
 
-        const all = [...fromStorage, ...fromAPI];
+        keys.forEach(k => {
+            if (Array.isArray(storage[k])) {
+                fromStorage.push(...storage[k]);
+            }
+        });
 
-        return all;
+        const fromAPI = (Lampa.Favorite && Lampa.Favorite.list)
+            ? Lampa.Favorite.list()
+            : [];
+
+        return [...fromStorage, ...fromAPI];
     }
 
     function normalize(items) {
@@ -45,55 +49,82 @@
         items.forEach(i => {
             if (!i || !i.id) return;
 
-            map.set(i.id, {
-                id: i.id,
+            const id = i.id;
+
+            map.set(id, {
+                id: id,
+
+                // НЕ завязываемся на next_episode (это ломало всё)
                 type: i.number_of_seasons ? 'tv' : 'movie',
-                title: i.title || i.name || i.original_title || i.original_name,
+
+                title:
+                    i.title ||
+                    i.name ||
+                    i.original_title ||
+                    i.original_name ||
+                    'Unknown',
+
+                poster: i.poster_path || null,
+
                 status: i.status || null,
-                next_episode: i.next_episode_to_air || null,
-                poster: i.poster_path || null
+
+                // сохраняем если есть, но НЕ используем как фильтр
+                next_episode: i.next_episode_to_air || null
             });
         });
 
-        return Array.from(map.values());
+        return [...map.values()];
     }
 
     function send(payload) {
 
-        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
+        const data = JSON.stringify(payload);
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url, true);
+        try {
+            const xhr = new XMLHttpRequest();
 
-        xhr.onload = function () {
-            Lampa.Noty.show('OK отправлено');
-            console.log('SENT', payload);
-        };
+            xhr.open('POST', URL, true);
 
-        xhr.onerror = function () {
-            Lampa.Noty.show('Ошибка отправки');
-        };
+            xhr.onload = function () {
+                Lampa.Noty.show('v5 POST OK');
+                console.log('v5 SENT');
+            };
 
-        xhr.send(JSON.stringify(payload));
+            xhr.onerror = function () {
+                fallback(data);
+            };
+
+            xhr.send(data);
+
+        } catch (e) {
+            fallback(data);
+        }
+    }
+
+    function fallback(data) {
+        const img = new Image();
+        img.src = URL + '?data=' + encodeURIComponent(data);
+
+        Lampa.Noty.show('v5 fallback sent');
     }
 
     function sync() {
 
-        const all = collectAll();
-        const normalized = normalize(all);
+        const raw = collectRaw();
+        const items = normalize(raw);
 
-        console.log('RAW COUNT:', all.length);
-        console.log('FINAL COUNT:', normalized.length);
+        console.log('RAW:', raw.length);
+        console.log('FINAL:', items.length);
 
-        if (!normalized.length) {
+        if (!items.length) {
             Lampa.Noty.show('Пусто');
             return;
         }
 
         const payload = {
             time: new Date().toISOString(),
-            count: normalized.length,
-            items: normalized
+            count: items.length,
+            items: items
         };
 
         send(payload);
@@ -101,19 +132,19 @@
 
     function init() {
 
-        console.log('Lampa v4 collector loaded');
+        console.log('Lampa v5 tracker loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'sync_v4',
+                    name: 'sync_v5',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: '📡 Sync FULL v4',
-                    description: 'Полный сбор данных без потерь'
+                    name: '📡 Sync ALL v5 (FULL)',
+                    description: 'Полный сбор без потерь'
                 },
                 onChange: sync
             });
