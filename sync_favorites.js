@@ -1,67 +1,93 @@
 (function () {
     'use strict';
 
-    function syncFavorites() {
-        let favorites = null;
+    function getData() {
+        let favorite = [];
+        let bookmarks = [];
 
         try {
-            // Пробуем разные варианты хранения
-            favorites = Lampa.Storage.get('favorite') 
-                     || Lampa.Storage.get('favorites') 
-                     || (Lampa.Favorite ? Lampa.Favorite.list() : null);
-        } catch (e) {
-            Lampa.Noty.show('Ошибка получения избранного');
-            return;
-        }
-
-        if (!favorites) {
-            Lampa.Noty.show('Избранное не найдено');
-            return;
-        }
+            favorite =
+                Lampa.Storage.get('favorite') ||
+                Lampa.Storage.get('favorites') ||
+                [];
+        } catch (e) {}
 
         try {
-            const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
+            bookmarks =
+                Lampa.Storage.get('bookmark') ||
+                Lampa.Storage.get('bookmarks') ||
+                [];
+        } catch (e) {}
 
-            const payload = {
-                time: new Date().toISOString(),
-                favorites: favorites
-            };
+        return { favorite, bookmarks };
+    }
 
-            const encoded = encodeURIComponent(JSON.stringify(payload));
+    function normalize(list) {
+        if (!Array.isArray(list)) return [];
 
-            // 🚀 отправка через Image (без CORS)
-            const img = new Image();
-            img.src = url + '?data=' + encoded;
+        return list
+            .filter(i => i && i.id)
+            .map(i => ({
+                id: i.id,
+                type: i.type || i.media_type || 'unknown',
+                title: i.title || i.name || ''
+            }));
+    }
 
-            Lampa.Noty.show('Отправлено!');
-        } catch (e) {
-            Lampa.Noty.show('Ошибка отправки');
-        }
+    function mergeUnique(a, b) {
+        const map = new Map();
+
+        [...a, ...b].forEach(item => {
+            map.set(item.id, item);
+        });
+
+        return Array.from(map.values());
+    }
+
+    function sync() {
+        const raw = getData();
+
+        const fav = normalize(raw.favorite);
+        const book = normalize(raw.bookmarks);
+
+        const merged = mergeUnique(fav, book);
+
+        const payload = {
+            time: new Date().toISOString(),
+            count: merged.length,
+            items: merged
+        };
+
+        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
+
+        const img = new Image();
+        img.src = url + '?data=' + encodeURIComponent(JSON.stringify(payload));
+
+        Lampa.Noty.show('Синхронизация отправлена');
+        console.log('SYNC PAYLOAD', payload);
     }
 
     function init() {
-        console.log('Favorites Sync Plugin loaded');
+        console.log('Lampa Sync Plugin loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'sync_favorites',
+                    name: 'sync_all',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: '📡 Отправить избранное',
-                    description: 'Отправка на webhook'
+                    name: '📡 Sync Favorites + Bookmarks',
+                    description: 'Отправка всех закладок'
                 },
                 onChange: function () {
-                    syncFavorites();
+                    sync();
                 }
             });
         }
     }
 
-    // Гарантированный запуск
     setTimeout(init, 3000);
-
 })();
