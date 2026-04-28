@@ -5,6 +5,7 @@
         let favorites = null;
 
         try {
+            // Пробуем разные варианты хранения
             favorites = Lampa.Storage.get('favorite') 
                      || Lampa.Storage.get('favorites') 
                      || (Lampa.Favorite ? Lampa.Favorite.list() : null);
@@ -18,26 +19,28 @@
             return;
         }
 
-        // 🔥 твой webhook
-        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
+        try {
+            const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
-        fetch(url, {
-    method: 'POST',
-    body: JSON.stringify({
-        time: new Date().toISOString(),
-        favorites: favorites
-    })
-})
-.then(res => {
-    Lampa.Noty.show('Отправлено!');
-})
-.catch(err => {
-    Lampa.Noty.show('Ошибка отправки');
-});
+            const payload = {
+                time: new Date().toISOString(),
+                favorites: favorites
+            };
+
+            const encoded = encodeURIComponent(JSON.stringify(payload));
+
+            // 🚀 отправка через Image (без CORS)
+            const img = new Image();
+            img.src = url + '?data=' + encoded;
+
+            Lampa.Noty.show('Отправлено!');
+        } catch (e) {
+            Lampa.Noty.show('Ошибка отправки');
+        }
     }
 
     function init() {
-        console.log('Plugin: Favorites Sync loaded');
+        console.log('Favorites Sync Plugin loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
@@ -48,7 +51,7 @@
                     default: false
                 },
                 field: {
-                    name: 'Отправить избранное',
+                    name: '📡 Отправить избранное',
                     description: 'Отправка на webhook'
                 },
                 onChange: function () {
@@ -58,5 +61,7 @@
         }
     }
 
-    setTimeout(init, 2000);
+    // Гарантированный запуск
+    setTimeout(init, 3000);
+
 })();
