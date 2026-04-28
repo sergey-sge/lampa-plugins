@@ -1,87 +1,119 @@
 (function () {
     'use strict';
 
-    function syncFavorites() {
+    function collectAll(raw) {
+        if (!raw) return [];
 
-        let favorites = null;
-        let bookmarks = null;
+        const keys = [
+            'card',
+            'like',
+            'book',
+            'look',
+            'viewed',
+            'scheduled',
+            'continued',
+            'wath',
+            'history'
+        ];
+
+        const all = [];
+
+        keys.forEach(k => {
+            if (Array.isArray(raw[k])) {
+                raw[k].forEach(i => all.push(i));
+            }
+        });
+
+        return all;
+    }
+
+    function normalize(items) {
+        const map = new Map();
+
+        items.forEach(i => {
+            if (!i || !i.id) return;
+
+            const id = i.id;
+
+            map.set(id, {
+                id: id,
+                type: i.number_of_seasons ? 'tv' : 'movie',
+                title: i.title || i.name || i.original_title || i.original_name,
+                status: i.status || null,
+                next_episode_to_air: i.next_episode_to_air || null,
+                poster: i.poster_path || null
+            });
+        });
+
+        return [...map.values()];
+    }
+
+    function sync() {
+        let raw = null;
 
         try {
-            // favorites
-            favorites =
+            raw =
                 Lampa.Storage.get('favorite') ||
                 Lampa.Storage.get('favorites') ||
-                (Lampa.Favorite ? Lampa.Favorite.list() : null);
-
-            // bookmarks
-            bookmarks =
-                Lampa.Storage.get('bookmark') ||
-                Lampa.Storage.get('bookmarks');
-
+                (Lampa.Favorite ? Lampa.Favorite.list() : {});
         } catch (e) {
             Lampa.Noty.show('Ошибка получения данных');
             return;
         }
 
-        if (!favorites && !bookmarks) {
+        const all = collectAll(raw);
+        const normalized = normalize(all);
+
+        if (!normalized.length) {
             Lampa.Noty.show('Нет данных');
             return;
         }
 
-        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
-
         const payload = {
             time: new Date().toISOString(),
-            favorites: favorites || [],
-            bookmarks: bookmarks || []
+            count: normalized.length,
+            items: normalized
         };
 
-        try {
-            const xhr = new XMLHttpRequest();
+        const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
-            xhr.open('POST', url, true);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', url, true);
 
-            // ❗ важно: НЕ ставим headers вообще
-            // РАБОЧАЯ ВЕРСИЯ!!!
-            xhr.onload = function () {
-                Lampa.Noty.show('POST отправлен');
-                console.log('RESPONSE:', xhr.responseText);
-            };
+        xhr.onload = function () {
+            Lampa.Noty.show('Синхронизация отправлена');
+            console.log('SYNC OK', payload);
+        };
 
-            xhr.onerror = function () {
-                Lampa.Noty.show('Ошибка POST');
-            };
-
-            xhr.send(JSON.stringify(payload));
-
-        } catch (e) {
+        xhr.onerror = function () {
             Lampa.Noty.show('Ошибка отправки');
-        }
+        };
+
+        xhr.send(JSON.stringify(payload));
     }
 
     function init() {
-        console.log('Favorites Sync Plugin loaded');
+        console.log('Lampa Sync v2 loaded');
 
         if (Lampa.SettingsApi) {
             Lampa.SettingsApi.addParam({
                 component: 'interface',
                 param: {
-                    name: 'sync_favorites',
+                    name: 'sync_all_v2',
                     type: 'button',
                     default: false
                 },
                 field: {
-                    name: '📡 Отправить избранное',
-                    description: 'POST sync favorites + bookmarks'
+                    name: '📡 Sync ALL (v2)',
+                    description: 'Полный экспорт всех списков'
                 },
                 onChange: function () {
-                    syncFavorites();
+                    sync();
                 }
             });
         }
     }
 
-    // запуск с задержкой (чтобы Lampa успела загрузиться)
     setTimeout(init, 3000);
 
 })();
