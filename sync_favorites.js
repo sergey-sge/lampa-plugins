@@ -1,40 +1,78 @@
 (function () {
     'use strict';
 
-    function getData() {
-        let favorite = [];
-        let bookmarks = [];
+    function syncFavorites() {
+        let favorites = null;
+        let bookmarks = null;
 
         try {
-            favorite =
-                Lampa.Storage.get('favorite') ||
-                Lampa.Storage.get('favorites') ||
-                [];
-        } catch (e) {}
+            // Избранное
+            favorites = Lampa.Storage.get('favorite') 
+                     || Lampa.Storage.get('favorites') 
+                     || (Lampa.Favorite ? Lampa.Favorite.list() : null);
+
+            // Закладки (важно для сериалов)
+            bookmarks = Lampa.Storage.get('bookmark') 
+                     || Lampa.Storage.get('bookmarks');
+        } catch (e) {
+            Lampa.Noty.show('Ошибка получения данных');
+            return;
+        }
+
+        if (!favorites && !bookmarks) {
+            Lampa.Noty.show('Нет данных');
+            return;
+        }
 
         try {
-            bookmarks =
-                Lampa.Storage.get('bookmark') ||
-                Lampa.Storage.get('bookmarks') ||
-                [];
-        } catch (e) {}
+            const url = 'https://webhook.site/7ed4abe2-6104-42aa-b5b7-6542f53cc219';
 
-        return { favorite, bookmarks };
+            const payload = {
+                time: new Date().toISOString(),
+                favorites: favorites || [],
+                bookmarks: bookmarks || []
+            };
+
+            const encoded = encodeURIComponent(JSON.stringify(payload));
+
+            // 🚀 отправка через Image (100% совместимо с Lampa)
+            const img = new Image();
+            img.src = url + '?data=' + encoded;
+
+            Lampa.Noty.show('Отправлено!');
+            console.log('SYNC PAYLOAD', payload);
+
+        } catch (e) {
+            Lampa.Noty.show('Ошибка отправки');
+        }
     }
 
-    function normalize(list) {
-        if (!Array.isArray(list)) return [];
+    function init() {
+        console.log('Favorites Sync Plugin loaded');
 
-        return list
-            .filter(i => i && i.id)
-            .map(i => ({
-                id: i.id,
-                type: i.type || i.media_type || 'unknown',
-                title: i.title || i.name || ''
-            }));
+        if (Lampa.SettingsApi) {
+            Lampa.SettingsApi.addParam({
+                component: 'interface',
+                param: {
+                    name: 'sync_favorites',
+                    type: 'button',
+                    default: false
+                },
+                field: {
+                    name: '📡 Отправить избранное + bookmarks',
+                    description: 'Синхронизация данных'
+                },
+                onChange: function () {
+                    syncFavorites();
+                }
+            });
+        }
     }
 
-    function mergeUnique(a, b) {
+    // Гарантированный запуск
+    setTimeout(init, 3000);
+
+})();    function mergeUnique(a, b) {
         const map = new Map();
 
         [...a, ...b].forEach(item => {
